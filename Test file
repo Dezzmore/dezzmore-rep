@@ -1,8 +1,7 @@
-
-import os
 import requests
-from bs4 import BeautifulSoup
 import youtube_dl
+from bs4 import BeautifulSoup
+from telegram import Video, ParseMode
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
 # функция загрузки видео
@@ -20,17 +19,18 @@ def download_video(url):
 def get_video_data(url):
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
-    title = soup.find('div', class_='video-title').text.strip()
+    title = soup.find('div', class_='content-heading').text.strip()
     description = soup.find('div', class_='video-description').text.strip()
-    return title, description
+    video_url = soup.find('div', class_='video-player').find('video').find('source').get('src')
+    return title, description, video_url
 
 # обработчик команды /video
 def video_handler(update, context):
     url = update.message.text.split(' ')[1]
-    title, description = get_video_data(url)
-    video_file = download_video(url)
+    title, description, video_url = get_video_data(url)
+    video_file = download_video(video_url)
     with open(video_file, 'rb') as f:
-        update.message.reply_video(f, caption=f'{title}\n\n{description}')
+        update.message.reply_video(video=f, caption=f'<b>{title}</b>\n\n{description}', parse_mode=ParseMode.HTML)
     os.remove(video_file)
 
 # обработчик текстовых сообщений
