@@ -1,1 +1,45 @@
 
+import os
+import requests
+from bs4 import BeautifulSoup
+import youtube_dl
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+
+# функция загрузки видео
+def download_video(url):
+    ydl_opts = {
+        'outtmpl': '%(title)s.%(ext)s',
+        'format': 'mp4',
+    }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+    video_file = max([f for f in os.listdir('.') if f.endswith('.mp4')], key=os.path.getctime)
+    return video_file
+
+# получение HTML-кода страницы с видео и описания видео
+def get_video_data(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    title = soup.find('div', class_='video-title').text.strip()
+    description = soup.find('div', class_='video-description').text.strip()
+    return title, description
+
+# обработчик команды /video
+def video_handler(update, context):
+    url = update.message.text.split(' ')[1]
+    title, description = get_video_data(url)
+    video_file = download_video(url)
+    with open(video_file, 'rb') as f:
+        update.message.reply_video(f, caption=f'{title}\n\n{description}')
+    os.remove(video_file)
+
+# обработчик текстовых сообщений
+def text_handler(update, context):
+    update.message.reply_text('Я не знаю, что ответить на это сообщение.')
+
+# создание и запуск бота
+updater = Updater('YOUR_API_KEY', use_context=True)
+updater.dispatcher.add_handler(CommandHandler('video', video_handler))
+updater.dispatcher.add_handler(MessageHandler(Filters.text, text_handler))
+updater.start_polling()
+updater.idle()
